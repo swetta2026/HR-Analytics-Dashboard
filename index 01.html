@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HR Analytics | Self-Service Executive Dashboard</title>
+
+<!-- Internet is required the first time for these libraries to load -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+:root{
+  --navy:#102A56; --blue:#2463B5; --green:#1E8E5A; --red:#D64545;
+  --orange:#E99000; --purple:#6B4FA1; --pink:#D94B82; --teal:#148A9C;
+  --bg:#F3F6FA; --card:#FFFFFF; --text:#1F2937; --muted:#64748B; --line:#DCE3EC;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--text)}
+.header{background:linear-gradient(135deg,var(--navy),#183F7C);color:#fff;padding:18px 24px;display:flex;align-items:center;justify-content:space-between;gap:20px}
+.header h1{margin:0;font-size:28px;letter-spacing:.7px}
+.header p{margin:5px 0 0;color:#D9E6FA;font-size:13px}
+.header-right{text-align:right;font-size:12px;color:#D9E6FA}
+.container{max-width:1600px;margin:auto;padding:18px}
+.upload-panel{background:#fff;border:2px dashed #9DB5D4;border-radius:14px;padding:22px;text-align:center;margin-bottom:16px}
+.upload-panel h2{margin:0 0 8px;color:var(--navy);font-size:20px}
+.upload-panel p{margin:5px;color:var(--muted);font-size:13px}
+.file-label{display:inline-block;background:var(--blue);color:#fff;padding:12px 22px;border-radius:8px;font-weight:bold;cursor:pointer;margin:12px 6px 4px}
+.file-label:hover,.btn:hover{filter:brightness(.95)}
+input[type=file]{display:none}
+.btn{border:0;background:var(--navy);color:white;padding:10px 16px;border-radius:7px;font-weight:bold;cursor:pointer}
+.btn.secondary{background:#EEF3FA;color:var(--navy);border:1px solid #CCD8E8}
+.btn.green{background:var(--green)}
+.status-msg{font-size:12px;color:var(--muted);margin-top:8px}
+.dashboard{display:none}
+.filter-bar{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:16px;display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+.filter-bar h3{margin:0 10px 5px 0;color:var(--navy);font-size:14px}
+.filter{display:flex;flex-direction:column;gap:4px}
+.filter label{font-size:10px;font-weight:bold;color:var(--muted)}
+select{min-width:140px;padding:8px;border:1px solid var(--line);border-radius:6px;background:#fff;font-size:12px}
+.kpi-grid{display:grid;grid-template-columns:repeat(5,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;position:relative;overflow:hidden;min-height:105px}
+.kpi:before{content:"";position:absolute;left:0;top:0;width:5px;height:100%;background:var(--blue)}
+.kpi.green:before{background:var(--green)} .kpi.red:before{background:var(--red)}
+.kpi.orange:before{background:var(--orange)} .kpi.purple:before{background:var(--purple)}
+.kpi.teal:before{background:var(--teal)} .kpi.pink:before{background:var(--pink)}
+.kpi .title{font-size:10px;font-weight:bold;color:var(--muted);text-transform:uppercase}
+.kpi .value{font-size:25px;font-weight:800;margin-top:10px;color:var(--text)}
+.kpi .sub{font-size:10px;color:var(--muted);margin-top:5px}
+.section-title{display:flex;justify-content:space-between;align-items:center;margin:20px 0 9px}
+.section-title h2{margin:0;color:var(--navy);font-size:18px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;min-width:0}
+.card h3{font-size:12px;margin:0 0 12px;color:#334155;text-align:left}
+.chart-wrap{height:300px;position:relative}
+.insights{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px}
+.insights h3{margin:0 0 10px;color:var(--navy)}
+.insight-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.insight{background:#F7F9FC;border-left:4px solid var(--blue);padding:11px;font-size:12px;line-height:1.45;border-radius:6px}
+.insight.warn{border-left-color:var(--orange)} .insight.good{border-left-color:var(--green)} .insight.risk{border-left-color:var(--red)}
+.data-info{font-size:12px;color:var(--muted);padding:7px 0}
+.table-wrap{overflow:auto;max-height:420px}
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{position:sticky;top:0;background:#EDF3FA;color:#26364F;text-align:left;padding:9px;border-bottom:1px solid var(--line)}
+td{padding:8px;border-bottom:1px solid #EDF1F5;white-space:nowrap}
+.footer{margin:18px 0 5px;padding:13px;background:#EAF0F8;border-radius:8px;text-align:center;font-size:12px;color:#3B4B63;font-weight:bold}
+.error{color:#B42318;font-weight:bold}
+.success{color:var(--green);font-weight:bold}
+.hidden{display:none}
+@media(max-width:1200px){.kpi-grid{grid-template-columns:repeat(3,1fr)}.grid-3{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:750px){.header{padding:15px}.header-right{display:none}.container{padding:10px}.kpi-grid,.grid-3,.grid-2,.insight-grid{grid-template-columns:1fr}.filter-bar{align-items:stretch}.filter select{width:100%}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>HR ANALYTICS DASHBOARD</h1>
+    <p>Data-Driven Insights • Better Decisions • Stronger Workforce</p>
+  </div>
+  <div class="header-right" id="headerInfo">
+    Self-Service Executive Dashboard<br>
+    Upload your HR Excel database to begin
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="upload-panel" id="uploadPanel">
+    <h2>📊 Upload Your HR Excel Database</h2>
+    <p>Supported formats: .xlsx, .xls, .csv &nbsp; | &nbsp; The dashboard automatically validates your headers and generates KPIs and analytics.</p>
+    <label class="file-label" for="fileInput">📁 CHOOSE EXCEL FILE</label>
+    <input id="fileInput" type="file" accept=".xlsx,.xls,.csv">
+    <button class="btn secondary" onclick="showRequiredHeaders()">View Required Headers</button>
+    <div class="status-msg" id="uploadStatus">Your data remains in your browser during analysis.</div>
+  </div>
+
+  <div class="dashboard" id="dashboard">
+
+    <div class="filter-bar">
+      <h3>🔎 FILTER DASHBOARD</h3>
+      <div class="filter"><label>Department</label><select id="fDepartment"></select></div>
+      <div class="filter"><label>Business Unit</label><select id="fBusinessUnit"></select></div>
+      <div class="filter"><label>Location</label><select id="fLocation"></select></div>
+      <div class="filter"><label>Gender</label><select id="fGender"></select></div>
+      <div class="filter"><label>Job Level</label><select id="fJobLevel"></select></div>
+      <div class="filter"><label>Status</label><select id="fStatus"></select></div>
+      <button class="btn" onclick="applyFilters()">Apply Filters</button>
+      <button class="btn secondary" onclick="resetFilters()">Reset</button>
+      <button class="btn green" onclick="exportExcelReport()">⬇ Export Excel Report</button>
+    </div>
+
+    <div class="data-info" id="dataInfo"></div>
+
+    <div class="section-title"><h2>1. Executive Workforce Snapshot</h2></div>
+    <div class="kpi-grid" id="kpiGrid"></div>
+
+    <div class="section-title"><h2>2. Ten Key Management Analytics</h2></div>
+    <div class="grid-3">
+      <div class="card"><h3>1. Workforce Distribution by Department</h3><div class="chart-wrap"><canvas id="deptChart"></canvas></div></div>
+      <div class="card"><h3>2. Attrition Rate by Department</h3><div class="chart-wrap"><canvas id="attritionDeptChart"></canvas></div></div>
+      <div class="card"><h3>3. Workforce by Business Unit</h3><div class="chart-wrap"><canvas id="buChart"></canvas></div></div>
+
+      <div class="card"><h3>4. Workforce Diversity by Gender</h3><div class="chart-wrap"><canvas id="genderChart"></canvas></div></div>
+      <div class="card"><h3>5. Workforce by Job Level</h3><div class="chart-wrap"><canvas id="jobLevelChart"></canvas></div></div>
+      <div class="card"><h3>6. Performance Rating Distribution</h3><div class="chart-wrap"><canvas id="performanceChart"></canvas></div></div>
+
+      <div class="card"><h3>7. Engagement Score by Department</h3><div class="chart-wrap"><canvas id="engagementChart"></canvas></div></div>
+      <div class="card"><h3>8. Training Hours by Department</h3><div class="chart-wrap"><canvas id="trainingChart"></canvas></div></div>
+      <div class="card"><h3>9. Absence Days by Department</h3><div class="chart-wrap"><canvas id="absenceChart"></canvas></div></div>
+
+      <div class="card"><h3>10. Top Exit Reasons</h3><div class="chart-wrap"><canvas id="exitReasonChart"></canvas></div></div>
+      <div class="card"><h3>Recruitment Source Effectiveness</h3><div class="chart-wrap"><canvas id="recruitmentChart"></canvas></div></div>
+      <div class="card"><h3>Promotion Status</h3><div class="chart-wrap"><canvas id="promotionChart"></canvas></div></div>
+    </div>
+
+    <div class="section-title"><h2>3. Executive Insights & Management Priorities</h2></div>
+    <div class="insights">
+      <h3>💡 Automatically Generated Management Insights</h3>
+      <div class="insight-grid" id="insightsGrid"></div>
+    </div>
+
+    <div class="section-title">
+      <h2>4. Filtered HR Data</h2>
+      <button class="btn secondary" onclick="downloadFilteredCSV()">⬇ Download Filtered CSV</button>
+    </div>
+    <div class="card">
+      <div class="table-wrap"><table id="dataTable"></table></div>
+    </div>
+
+    <div class="footer">
+      🎯 Use data to understand people. Take action to strengthen performance, engagement and retention.
+    </div>
+  </div>
+</div>
+
+<script>
+const REQUIRED_HEADERS = [
+  "Employee ID","Employee Name","Department","Business Unit","Location","Job Level",
+  "Designation","Gender","Employment Type","Status","Hire Date","Exit Date",
+  "Exit Type","Exit Reason","Age","Manager","Salary (INR)","Performance Rating",
+  "Engagement Score","Absence Days","Training Hours","Promotion Status","Recruitment Source"
+];
+
+let rawData = [], filteredData = [], charts = {}, currentAnalytics = {};
+
+function normalizeHeader(h){
+  return String(h || "").replace(/\s+/g," ").trim().toLowerCase();
+}
+function cleanKey(obj){
+  const out = {};
+  Object.keys(obj).forEach(k => out[normalizeHeader(k)] = obj[k]);
+  return out;
+}
+function getVal(row, header){
+  return row[normalizeHeader(header)];
+}
+function num(v){
+  if(v === null || v === undefined || v === "") return null;
+  if(typeof v === "number") return isFinite(v) ? v : null;
+  let x = String(v).replace(/₹|INR|,/gi,"").replace(/[^\d.-]/g,"");
+  const n = parseFloat(x);
+  return isFinite(n) ? n : null;
+}
+function parseDate(v){
+  if(!v) return null;
+  if(v instanceof Date && !isNaN(v)) return v;
+  if(typeof v === "number" && window.XLSX){
+    const d = XLSX.SSF.parse_date_code(v);
+    if(d) return new Date(d.y,d.m-1,d.d);
+  }
+  const d = new Date(v);
+  return isNaN(d) ? null : d;
+}
+function fmtNum(n, digits=0){
+  if(n===null || n===undefined || !isFinite(n)) return "N/A";
+  return Number(n).toLocaleString("en-IN",{maximumFractionDigits:digits,minimumFractionDigits:digits});
+}
+function fmtINR(n){
+  if(n===null || !isFinite(n)) return "N/A";
+  return "₹"+Number(n).toLocaleString("en-IN",{maximumFractionDigits:0});
+}
+function pct(n){ return (isFinite(n)?n:0).toFixed(1)+"%"; }
+function activeStatus(v){
+  const s = String(v||"").trim().toLowerCase();
+  return ["active","current","employed","working"].some(x=>s.includes(x));
+}
+function exitedStatus(v,row){
+  const s = String(v||"").trim().toLowerCase();
+  if(["exited","inactive","terminated","separated","separated"].some(x=>s.includes(x))) return true;
+  return !!parseDate(getVal(row,"Exit Date"));
+}
+function groupCount(rows, field){
+  const m = {};
+  rows.forEach(r=>{ const k=String(getVal(r,field)||"Not Specified").trim()||"Not Specified"; m[k]=(m[k]||0)+1; });
+  return sortObj(m);
+}
+function groupAvg(rows, groupField, valueField){
+  const m={};
+  rows.forEach(r=>{
+    const k=String(getVal(r,groupField)||"Not Specified").trim()||"Not Specified";
+    const v=num(getVal(r,valueField));
+    if(v!==null){ if(!m[k])m[k]=[]; m[k].push(v); }
+  });
+  const o={}; Object.keys(m).forEach(k=>o[k]=m[k].reduce((a,b)=>a+b,0)/m[k].length);
+  return sortObj(o);
+}
+function groupSum(rows, groupField, valueField){
+  const m={};
+  rows.forEach(r=>{
+    const k=String(getVal(r,groupField)||"Not Specified").trim()||"Not Specified";
+    const v=num(getVal(r,valueField))||0; m[k]=(m[k]||0)+v;
+  });
+  return sortObj(m);
+}
+function sortObj(obj){
+  return Object.fromEntries(Object.entries(obj).sort((a,b)=>b[1]-a[1]));
+}
+function topEntries(obj,n=12){
+  return Object.entries(obj).slice(0,n);
+}
+function yearsTenure(row){
+  const hire=parseDate(getVal(row,"Hire Date"));
+  if(!hire) return null;
+  const exit=parseDate(getVal(row,"Exit Date"));
+  const end=exit || new Date();
+  const y=(end-hire)/(365.25*24*3600*1000);
+  return y>=0 && y<100 ? y : null;
+}
+function average(arr){
+  const a=arr.filter(v=>v!==null && isFinite(v));
+  return a.length ? a.reduce((x,y)=>x+y,0)/a.length : null;
+}
+function uniqueValues(field){
+  return [...new Set(rawData.map(r=>String(getVal(r,field)||"Not Specified").trim()||"Not Specified"))].sort();
+}
+function setupFilters(){
+  const map={
+    fDepartment:"Department",fBusinessUnit:"Business Unit",fLocation:"Location",
+    fGender:"Gender",fJobLevel:"Job Level",fStatus:"Status"
+  };
+  Object.entries(map).forEach(([id,field])=>{
+    const el=document.getElementById(id);
+    el.innerHTML='<option value="__ALL__">All</option>';
+    uniqueValues(field).forEach(v=>{
+      const o=document.createElement("option");o.value=v;o.textContent=v;el.appendChild(o);
+    });
+  });
+}
+function applyFilters(){
+  const map={
+    fDepartment:"Department",fBusinessUnit:"Business Unit",fLocation:"Location",
+    fGender:"Gender",fJobLevel:"Job Level",fStatus:"Status"
+  };
+  filteredData=rawData.filter(r=>{
+    return Object.entries(map).every(([id,field])=>{
+      const selected=document.getElementById(id).value;
+      return selected==="__ALL__" || String(getVal(r,field)||"Not Specified").trim()===selected;
+    });
+  });
+  renderDashboard();
+}
+function resetFilters(){
+  document.querySelectorAll(".filter-bar select").forEach(s=>s.value="__ALL__");
+  filteredData=[...rawData]; renderDashboard();
+}
+function makeKPI(title,value,sub,cls=""){
+  return `<div class="kpi ${cls}"><div class="title">${title}</div><div class="value">${value}</div><div class="sub">${sub||""}</div></div>`;
+}
+function computeAnalytics(rows){
+  const total=rows.length;
+  const active=rows.filter(r=>activeStatus(getVal(r,"Status"))).length;
+  const exited=rows.filter(r=>exitedStatus(getVal(r,"Status"),r)).length;
+  const rate=total ? exited/total*100 : 0;
+  const avgAge=average(rows.map(r=>num(getVal(r,"Age"))));
+  const avgTenure=average(rows.map(yearsTenure));
+  const avgSalary=average(rows.map(r=>num(getVal(r,"Salary (INR)"))));
+  const avgEng=average(rows.map(r=>num(getVal(r,"Engagement Score"))));
+  const avgAbs=average(rows.map(r=>num(getVal(r,"Absence Days"))));
+  const totalTraining=rows.reduce((s,r)=>s+(num(getVal(r,"Training Hours"))||0),0);
+  const promoted=rows.filter(r=>String(getVal(r,"Promotion Status")||"").toLowerCase().match(/yes|promoted|eligible|approved/)).length;
+
+  const dept=groupCount(rows,"Department");
+  const bu=groupCount(rows,"Business Unit");
+  const gender=groupCount(rows,"Gender");
+  const jobLevel=groupCount(rows,"Job Level");
+  const performance=groupCount(rows,"Performance Rating");
+  const engagement=groupAvg(rows,"Department","Engagement Score");
+  const training=groupSum(rows,"Department","Training Hours");
+  const absence=groupSum(rows,"Department","Absence Days");
+  const exitReasons=groupCount(rows.filter(r=>exitedStatus(getVal(r,"Status"),r)),"Exit Reason");
+  const recruitment=groupCount(rows,"Recruitment Source");
+  const promotion=groupCount(rows,"Promotion Status");
+
+  const attrDept={};
+  Object.keys(dept).forEach(d=>{
+    const subset=rows.filter(r=>String(getVal(r,"Department")||"Not Specified").trim()===d);
+    const ex=subset.filter(r=>exitedStatus(getVal(r,"Status"),r)).length;
+    attrDept[d]=subset.length?ex/subset.length*100:0;
+  });
+
+  return {total,active,exited,rate,avgAge,avgTenure,avgSalary,avgEng,avgAbs,totalTraining,promoted,
+    dept,bu,gender,jobLevel,performance,engagement,training,absence,exitReasons,recruitment,promotion,attrDept};
+}
+function destroyCharts(){Object.values(charts).forEach(c=>c.destroy());charts={};}
+const colors=["#2463B5","#1E8E5A","#E99000","#6B4FA1","#D94B82","#148A9C","#D64545","#64748B","#4E7A44","#8B5E3C"];
+function chart(id,type,labels,data,label,options={}){
+  const ctx=document.getElementById(id);
+  if(!ctx)return;
+  charts[id]=new Chart(ctx,{
+    type,
+    data:{labels,datasets:[{
+      label,data,
+      backgroundColor:type==="line"?"rgba(36,99,181,.18)":colors.slice(0,labels.length),
+      borderColor:type==="line"?"#2463B5":colors.slice(0,labels.length),
+      borderWidth:type==="line"?2:0,
+      fill:type==="line",
+      tension:.35,
+      borderRadius:type==="bar"?4:0
+    }]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:type==="doughnut"||type==="pie",position:"right",labels:{font:{size:10}}}},
+      scales:(type==="doughnut"||type==="pie")?{}:{
+        y:{beginAtZero:true,ticks:{font:{size:10},callback:options.percent?x=>x+"%":undefined}},
+        x:{ticks:{font:{size:10}}}
+      },
+      ...options
+    }
+  });
+}
+function renderDashboard(){
+  currentAnalytics=computeAnalytics(filteredData);
+  const a=currentAnalytics;
+  document.getElementById("dataInfo").innerHTML=
+    `<b>${fmtNum(a.total)}</b> employees currently analysed from the uploaded dataset. `+
+    `Filters are applied to all KPIs, charts and exported reports.`;
+
+  document.getElementById("kpiGrid").innerHTML=[
+    makeKPI("Total Employees",fmtNum(a.total),"Selected workforce",""),
+    makeKPI("Active Employees",fmtNum(a.active),a.total?pct(a.active/a.total*100)+" of selected workforce":"", "green"),
+    makeKPI("Attrition Count",fmtNum(a.exited),pct(a.rate)+" attrition rate","red"),
+    makeKPI("Average Age",fmtNum(a.avgAge,1),"Years","orange"),
+    makeKPI("Average Tenure",fmtNum(a.avgTenure,1),"Years calculated from Hire / Exit Date","purple"),
+    makeKPI("Average Salary",fmtINR(a.avgSalary),"Based on available salary records","teal"),
+    makeKPI("Engagement Score",fmtNum(a.avgEng,1),"Average score","pink"),
+    makeKPI("Absence Days",fmtNum(a.avgAbs,1),"Average per employee","orange"),
+    makeKPI("Training Hours",fmtNum(a.totalTraining),"Total training investment","green"),
+    makeKPI("Promotion Rate",a.total?pct(a.promoted/a.total*100):"N/A",fmtNum(a.promoted)+" promotion records","purple")
+  ].join("");
+
+  destroyCharts();
+  let e=topEntries(a.dept); chart("deptChart","doughnut",e.map(x=>x[0]),e.map(x=>x[1]),"Employees");
+  e=topEntries(a.attrDept); chart("attritionDeptChart","bar",e.map(x=>x[0]),e.map(x=>+x[1].toFixed(1)),"Attrition Rate",{percent:true});
+  e=topEntries(a.bu); chart("buChart","bar",e.map(x=>x[0]),e.map(x=>x[1]),"Employees");
+  e=topEntries(a.gender); chart("genderChart","doughnut",e.map(x=>x[0]),e.map(x=>x[1]),"Employees");
+  e=topEntries(a.jobLevel); chart("jobLevelChart","bar",e.map(x=>x[0]),e.map(x=>x[1]),"Employees");
+  e=topEntries(a.performance); chart("performanceChart","bar",e.map(x=>x[0]),e.map(x=>x[1]),"Employees");
+  e=topEntries(a.engagement); chart("engagementChart","bar",e.map(x=>x[0]),e.map(x=>+x[1].toFixed(1)),"Average Engagement");
+  e=topEntries(a.training); chart("trainingChart","bar",e.map(x=>x[0]),e.map(x=>Math.round(x[1])),"Training Hours");
+  e=topEntries(a.absence); chart("absenceChart","bar",e.map(x=>x[0]),e.map(x=>Math.round(x[1])),"Absence Days");
+  e=topEntries(a.exitReasons); chart("exitReasonChart","bar",e.map(x=>x[0]),e.map(x=>x[1]),"Exit Count",{indexAxis:"y"});
+  e=topEntries(a.recruitment); chart("recruitmentChart","bar",e.map(x=>x[0]),e.map(x=>x[1]),"Employees");
+  e=topEntries(a.promotion); chart("promotionChart","doughnut",e.map(x=>x[0]),e.map(x=>x[1]),"Employees");
+
+  generateInsights(a);
+  renderTable(filteredData.slice(0,500));
+}
+function highest(obj){
+  const e=topEntries(obj,1)[0]; return e?{name:e[0],value:e[1]}:null;
+}
+function lowest(obj){
+  const e=Object.entries(obj).sort((a,b)=>a[1]-b[1])[0]; return e?{name:e[0],value:e[1]}:null;
+}
+function generateInsights(a){
+  const topDept=highest(a.dept), riskDept=highest(a.attrDept), lowEng=lowest(a.engagement),
+        topReason=highest(a.exitReasons), topAbs=highest(a.absence), topSource=highest(a.recruitment);
+  const insights=[];
+  insights.push({cls:a.rate>=15?"risk":"good",text:`<b>Attrition:</b> Overall attrition is <b>${pct(a.rate)}</b> (${fmtNum(a.exited)} employees). ${riskDept?`The highest department-level attrition is <b>${riskDept.name}</b> at <b>${pct(riskDept.value)}</b>.`:""}`});
+  if(topDept) insights.push({cls:"",text:`<b>Workforce concentration:</b> <b>${topDept.name}</b> is the largest workforce segment with <b>${fmtNum(topDept.value)}</b> employees. Management should assess succession and capacity risks in this area.`});
+  if(lowEng && lowEng.value!==null) insights.push({cls:lowEng.value<60?"warn":"good",text:`<b>Engagement priority:</b> <b>${lowEng.name}</b> has the lowest average engagement score at <b>${fmtNum(lowEng.value,1)}</b>. Consider focused manager action and employee listening.`});
+  if(topReason) insights.push({cls:"risk",text:`<b>Exit driver:</b> The leading recorded exit reason is <b>${topReason.name}</b> (${fmtNum(topReason.value)} exits). Review retention actions around this driver.`});
+  insights.push({cls:"good",text:`<b>Capability investment:</b> The selected workforce has completed <b>${fmtNum(a.totalTraining)}</b> training hours. Compare this investment with performance and internal mobility outcomes.`});
+  if(topAbs) insights.push({cls:"warn",text:`<b>Absence pattern:</b> <b>${topAbs.name}</b> records the highest total absence days (<b>${fmtNum(topAbs.value)}</b>). Review workload, attendance patterns and wellbeing indicators.`});
+  if(topSource) insights.push({cls:"",text:`<b>Talent acquisition:</b> <b>${topSource.name}</b> is the largest recorded recruitment source. Evaluate source quality using performance, tenure and retention outcomes.`});
+  insights.push({cls:"good",text:`<b>Workforce profile:</b> Average employee age is <b>${fmtNum(a.avgAge,1)}</b> years and average tenure is <b>${fmtNum(a.avgTenure,1)}</b> years. Use these indicators for workforce planning and succession discussions.`});
+  insights.push({cls:"",text:`<b>Compensation lens:</b> Average salary in the selected data is <b>${fmtINR(a.avgSalary)}</b>. Analyse department and job-level pay distribution before making compensation decisions.`});
+  insights.push({cls:"good",text:`<b>Executive action:</b> Prioritise departments with high attrition, low engagement and high absence simultaneously. These areas represent the strongest potential people-risk signals.`});
+  document.getElementById("insightsGrid").innerHTML=insights.map(i=>`<div class="insight ${i.cls}">${i.text}</div>`).join("");
+}
+function renderTable(rows){
+  const table=document.getElementById("dataTable");
+  if(!rows.length){table.innerHTML="<tr><td>No records match the selected filters.</td></tr>";return;}
+  const headers=REQUIRED_HEADERS.filter(h=>rows.some(r=>getVal(r,h)!==undefined));
+  table.innerHTML="<thead><tr>"+headers.map(h=>`<th>${escapeHtml(h)}</th>`).join("")+
+    "</tr></thead><tbody>"+rows.map(r=>"<tr>"+headers.map(h=>`<td>${escapeHtml(formatCell(getVal(r,h)))}</td>`).join("")+"</tr>").join("")+"</tbody>";
+}
+function formatCell(v){
+  if(v===undefined||v===null)return "";
+  if(v instanceof Date)return v.toLocaleDateString("en-GB");
+  return String(v);
+}
+function escapeHtml(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));}
+
+document.getElementById("fileInput").addEventListener("change", handleFile);
+function handleFile(evt){
+  const file=evt.target.files[0]; if(!file)return;
+  const status=document.getElementById("uploadStatus");
+  status.textContent="Reading and validating your HR data...";
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      let rows;
+      if(file.name.toLowerCase().endsWith(".csv")){
+        const wb=XLSX.read(e.target.result,{type:"string",raw:false,cellDates:true});
+        rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:"",raw:false});
+      }else{
+        const wb=XLSX.read(e.target.result,{type:"array",cellDates:true});
+        rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:"",raw:false});
+      }
+      if(!rows.length)throw new Error("The selected file contains no readable data.");
+      const first=cleanKey(rows[0]);
+      const found=Object.keys(first);
+      const missing=REQUIRED_HEADERS.filter(h=>!found.includes(normalizeHeader(h)));
+      if(missing.length){
+        status.innerHTML=`<span class="error">Header validation failed.</span><br>Missing or differently named headers: <b>${missing.join(", ")}</b><br><br>
+        Please ensure the Excel column names match the required headers.`;
+        return;
+      }
+      rawData=rows.map(cleanKey);
+      filteredData=[...rawData];
+      setupFilters();
+      document.getElementById("dashboard").style.display="block";
+      document.getElementById("uploadPanel").style.borderColor="#4CAF7D";
+      status.innerHTML=`<span class="success">✓ Successfully loaded ${fmtNum(rawData.length)} HR records.</span> Dashboard generated below.`;
+      document.getElementById("headerInfo").innerHTML=`Dataset loaded<br><b>${fmtNum(rawData.length)} employee records</b>`;
+      renderDashboard();
+      setTimeout(()=>document.getElementById("dashboard").scrollIntoView({behavior:"smooth"}),150);
+    }catch(err){
+      console.error(err);
+      status.innerHTML=`<span class="error">Unable to read this file: ${escapeHtml(err.message)}</span>`;
+    }
+  };
+  if(file.name.toLowerCase().endsWith(".csv")) reader.readAsText(file);
+  else reader.readAsArrayBuffer(file);
+}
+function showRequiredHeaders(){
+  alert("Your uploaded Excel file must contain these 23 headers:\n\n"+REQUIRED_HEADERS.join("\n"));
+}
+function exportExcelReport(){
+  if(!filteredData.length){alert("No data available to export.");return;}
+  const a=currentAnalytics;
+  const summary=[
+    {"KPI":"Total Employees","Value":a.total},
+    {"KPI":"Active Employees","Value":a.active},
+    {"KPI":"Attrition Count","Value":a.exited},
+    {"KPI":"Attrition Rate","Value":a.rate/100},
+    {"KPI":"Average Age","Value":a.avgAge},
+    {"KPI":"Average Tenure (Years)","Value":a.avgTenure},
+    {"KPI":"Average Salary (INR)","Value":a.avgSalary},
+    {"KPI":"Average Engagement Score","Value":a.avgEng},
+    {"KPI":"Average Absence Days","Value":a.avgAbs},
+    {"KPI":"Total Training Hours","Value":a.totalTraining},
+    {"KPI":"Promotion Records","Value":a.promoted}
+  ];
+  const wb=XLSX.utils.book_new();
+  function addSheet(name,arr){
+    const ws=XLSX.utils.json_to_sheet(arr);
+    XLSX.utils.book_append_sheet(wb,ws,name.substring(0,31));
+  }
+  addSheet("Executive Summary",summary);
+  addSheet("Department Analysis",Object.entries(a.dept).map(([Department,Employees])=>({
+    Department,Employees,
+    "Attrition Rate %":+(a.attrDept[Department]||0).toFixed(2),
+    "Avg Engagement":+(a.engagement[Department]||0).toFixed(2),
+    "Training Hours":+(a.training[Department]||0).toFixed(0),
+    "Absence Days":+(a.absence[Department]||0).toFixed(0)
+  })));
+  addSheet("Business Unit Analysis",Object.entries(a.bu).map(([BusinessUnit,Employees])=>({"Business Unit":BusinessUnit,Employees})));
+  addSheet("Exit Reasons",Object.entries(a.exitReasons).map(([ExitReason,ExitCount])=>({"Exit Reason":ExitReason,"Exit Count":ExitCount})));
+  addSheet("Recruitment Sources",Object.entries(a.recruitment).map(([RecruitmentSource,Employees])=>({"Recruitment Source":RecruitmentSource,Employees})));
+  addSheet("Filtered HR Data",filteredData.map(r=>{
+    const o={}; REQUIRED_HEADERS.forEach(h=>o[h]=getVal(r,h)); return o;
+  }));
+  XLSX.writeFile(wb,"HR_Analytics_Management_Report.xlsx");
+}
+function downloadFilteredCSV(){
+  if(!filteredData.length)return;
+  const rows=filteredData.map(r=>{const o={};REQUIRED_HEADERS.forEach(h=>o[h]=getVal(r,h));return o;});
+  const ws=XLSX.utils.json_to_sheet(rows);
+  const csv=XLSX.utils.sheet_to_csv(ws);
+  const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="Filtered_HR_Data.csv";a.click();URL.revokeObjectURL(a.href);
+}
+</script>
+</body>
+</html>
